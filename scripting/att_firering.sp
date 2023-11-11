@@ -323,8 +323,6 @@ void InitiateFireRing(int iClient, int iWeapon)
     {
         int iEntity = EntRefToEntIndex(playersHitList.Get(index));
 
-        PrintToChatAll("fart");
-
         if(iEntity == -1)
             continue;
 
@@ -337,8 +335,6 @@ void InitiateFireRing(int iClient, int iWeapon)
         if(TF2_IsPlayerInCondition(iEntity, TFCond_UberchargedHidden) || TF2_IsPlayerInCondition(iEntity, TFCond_FireImmune) || TF2_IsPlayerInCondition(iEntity, TFCond_Ubercharged))
             continue;
 
-        PrintToChatAll("test: %i", iEntity);
-
         GetEntPropVector(iEntity, Prop_Send, "m_vecMaxs", fMax);
         GetEntPropVector(iEntity, Prop_Send, "m_vecMins", fMin);
 
@@ -347,8 +343,6 @@ void InitiateFireRing(int iClient, int iWeapon)
         if(!((fVec[2] > fVecEnemy[2] + fMin[2] - 32.0) && (fVec[2] < fVecEnemy[2] + fMax[2])))
             continue;
         
-        PrintToChatAll("test");
-
         SDKHooks_TakeDamage(iEntity, iClient, iClient, Weapon[iWeapon].m_fDamage, DMG_PLASMA | DMG_PREVENT_PHYSICS_FORCE);
     }
 
@@ -360,8 +354,6 @@ bool TraceFindPlayers(int hitEntity, ArrayList list)
     if(hitEntity <= 0 || hitEntity > MaxClients)
         return true;
 
-    PrintToChatAll("Traced entity: %i", hitEntity);
-    
     list.Push(EntIndexToEntRef(hitEntity));
 
     return true;
