@@ -4,7 +4,7 @@
 #include <tf2_stocks>
 
 #include <tf_custom_attributes>
-#include <tf2wearables>
+#include <tf2utils>
 
 #include <stocksoup/var_strings>
 
@@ -17,7 +17,7 @@
 #define PLUGIN_NAME         "[CA] Fire Ring Attribute"
 #define PLUGIN_AUTHOR       "Zabaniya001"
 #define PLUGIN_DESCRIPTION  "Hello darling. This plugin uses Nosoop's Custom Attributes framework. This Custom Attribute lets, once you reach enough rage, utilize fire spells ( damage depends on how much rage you have )."
-#define PLUGIN_VERSION      "1.0.0"
+#define PLUGIN_VERSION      "1.0.1"
 #define PLUGIN_URL          "https://alliedmods.net"
 
 public Plugin myinfo = {
@@ -87,26 +87,12 @@ static const char sDeniedSounds[][] =
     "replay/record_fail.wav"
 };
 
-Handle g_SDKCallFindEntityInSphere;
-
 // ||──────────────────────────────────────────────────────────────────────────||
 // ||                               SOURCEMOD API                              ||
 // ||──────────────────────────────────────────────────────────────────────────||
 
 public void OnPluginStart() 
 {
-    GameData hConf = new GameData("tf2.cattr_starterpack");
-
-    StartPrepSDKCall(SDKCall_EntityList);
-    PrepSDKCall_SetFromConf(hConf, SDKConf_Signature, "CGlobalEntityList::FindEntityInSphere()");
-    PrepSDKCall_SetReturnInfo(SDKType_CBaseEntity, SDKPass_Pointer);
-    PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer, VDECODE_FLAG_ALLOWNULL | VDECODE_FLAG_ALLOWWORLD);
-    PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_ByRef);
-    PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
-    g_SDKCallFindEntityInSphere = EndPrepSDKCall();
-
-    delete hConf;
-
     HookEvent("post_inventory_application", Event_OnPostInventoryApplication);
 
     // In case of late load.
@@ -125,6 +111,8 @@ public void OnMapStart()
     {
         PrecacheSound(sDeniedSounds[i], true);
     }
+
+    return;
 }
 
 public void OnClientPutInServer(int iClient)
@@ -150,27 +138,29 @@ public void OnEntityDestroyed(int iEntity)
     return;
 }
 
-public void OnWeaponEquipPost(int iClient, int iWeapon)
+void OnWeaponEquipPost(int iClient, int iWeapon)
 {
     char sAttributes[140];
     if(!TF2CustAttr_GetString(iWeapon, "fire ring attribute", sAttributes, sizeof(sAttributes)))
         return;
 
+    Weapon[iWeapon].Destroy();
+    
     Weapon[iWeapon].Init(sAttributes);
 
     return;
 }
 
-public void Event_OnPostInventoryApplication(Event event, const char[] name, bool bDontBroadcast)
+void Event_OnPostInventoryApplication(Event event, const char[] name, bool bDontBroadcast)
 {
     int iClient = GetClientOfUserId(event.GetInt("userid"));
 
     if(!IsValidClient(iClient))
         return;
 
-    for(eTF2LoadoutSlot eSlot = TF2LoadoutSlot_Primary; eSlot < TF2LoadoutSlot_Misc3; eSlot++)
+    for(int iSlot = 0; iSlot < 10; iSlot++)
     {
-        int iWeapon = TF2_GetPlayerLoadoutSlot(iClient, eSlot);
+        int iWeapon = TF2Util_GetPlayerLoadoutEntity(iClient, iSlot);
 
         if(!IsValidEntity(iWeapon))
             continue;
@@ -178,6 +168,8 @@ public void Event_OnPostInventoryApplication(Event event, const char[] name, boo
         char sAttributes[140];
         if(!TF2CustAttr_GetString(iWeapon, "fire ring attribute", sAttributes, sizeof(sAttributes)))
             continue;
+
+        Weapon[iWeapon].Destroy();
 
         Weapon[iWeapon].Init(sAttributes);
     }
@@ -234,7 +226,7 @@ public void OnPlayerRunCmdPost(int iClient, int iButtons)
     return;
 }
 
-public Action OnTakeDamageAlive(int iVictim, int &iAttacker, int &iInflictor, float &fDamage, int &iDamageType, int &iWeapon, float fDamageForce[3], float fDamagePosition[3], int iDamageCustom)
+Action OnTakeDamageAlive(int iVictim, int &iAttacker, int &iInflictor, float &fDamage, int &iDamageType, int &iWeapon, float fDamageForce[3], float fDamagePosition[3], int iDamageCustom)
 {
     if(!IsValidEntity(iVictim) || !IsValidEntity(iAttacker) || !IsValidEntity(iWeapon) || iAttacker == iVictim)
         return Plugin_Continue;
@@ -270,7 +262,7 @@ public void OnTakeDamageAlivePost(int iVictim, int iAttacker, int iInflictor, fl
 // ||                               Functions                                  ||
 // ||──────────────────────────────────────────────────────────────────────────||
 
-public Action Timer_FireRing(Handle timer, DataPack hPack)
+Action Timer_FireRing(Handle timer, DataPack hPack)
 {
     hPack.Reset();
 
@@ -307,10 +299,8 @@ public Action Timer_FireRing(Handle timer, DataPack hPack)
 }
 
 // Similar logic to what the huo long heater has apart from a little portion. It was too overkill :shrug: for what I needed
-public void InitiateFireRing(int iClient, int iWeapon)
+void InitiateFireRing(int iClient, int iWeapon)
 {
-    int iEntity = -1;
-
     TFTeam team = TF2_GetClientTeam(iClient);
 
     float fVec[3];
@@ -326,9 +316,19 @@ public void InitiateFireRing(int iClient, int iWeapon)
 
     float fVecEnemy[3];
 
-    while((iEntity = FindEntityInSphere(iEntity, fVec, Weapon[iWeapon].m_fRadius)) != -1)
+    ArrayList playersHitList = new ArrayList();
+    TR_EnumerateEntitiesSphere(fVec, Weapon[iWeapon].m_fRadius, PARTITION_SOLID_EDICTS, TraceFindPlayers, playersHitList);
+
+    for(int index = 0; index < playersHitList.Length; index++) 
     {
-        if(iEntity < 0 || iEntity > MaxClients)
+        int iEntity = EntRefToEntIndex(playersHitList.Get(index));
+
+        PrintToChatAll("fart");
+
+        if(iEntity == -1)
+            continue;
+
+        if(iClient == iEntity)
             continue;
 
         if(TF2_GetClientTeam(iEntity) == team)
@@ -337,6 +337,8 @@ public void InitiateFireRing(int iClient, int iWeapon)
         if(TF2_IsPlayerInCondition(iEntity, TFCond_UberchargedHidden) || TF2_IsPlayerInCondition(iEntity, TFCond_FireImmune) || TF2_IsPlayerInCondition(iEntity, TFCond_Ubercharged))
             continue;
 
+        PrintToChatAll("test: %i", iEntity);
+
         GetEntPropVector(iEntity, Prop_Send, "m_vecMaxs", fMax);
         GetEntPropVector(iEntity, Prop_Send, "m_vecMins", fMin);
 
@@ -344,11 +346,25 @@ public void InitiateFireRing(int iClient, int iWeapon)
 
         if(!((fVec[2] > fVecEnemy[2] + fMin[2] - 32.0) && (fVec[2] < fVecEnemy[2] + fMax[2])))
             continue;
+        
+        PrintToChatAll("test");
 
         SDKHooks_TakeDamage(iEntity, iClient, iClient, Weapon[iWeapon].m_fDamage, DMG_PLASMA | DMG_PREVENT_PHYSICS_FORCE);
     }
 
     return;
+}
+
+bool TraceFindPlayers(int hitEntity, ArrayList list)
+{
+    if(hitEntity <= 0 || hitEntity > MaxClients)
+        return true;
+
+    PrintToChatAll("Traced entity: %i", hitEntity);
+    
+    list.Push(EntIndexToEntRef(hitEntity));
+
+    return true;
 }
 
 // ||──────────────────────────────────────────────────────────────────────────||
@@ -399,11 +415,6 @@ stock int TF2_GetActiveWeapon(int iClient)
     return GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
 }
 
-stock int FindEntityInSphere(int startEntity, const float vecPosition[3], float flRadius) 
-{
-    return SDKCall(g_SDKCallFindEntityInSphere, startEntity, vecPosition, flRadius);
-}
-
 stock int AttachParticle(int entity, char[] particleType, float duration = 1.0, float offset=0.0, bool attach=true)
 {
     int particle = CreateEntityByName("info_particle_system");
@@ -428,19 +439,13 @@ stock int AttachParticle(int entity, char[] particleType, float duration = 1.0, 
         AcceptEntityInput(particle, "SetParent", particle, particle, 0);
         SetEntPropEnt(particle, Prop_Send, "m_hOwnerEntity", entity);
     }
-    else {
+    else
+    {
         SetEntPropEnt(particle, Prop_Data, "m_hEffectEntity", entity);
     }
 
     ActivateEntity(particle);
     AcceptEntityInput(particle, "start");
 
-    // CreateTimer(duration, Timer_DeleteParticle, particle);
-
     return particle;
 }
-
-//public Action Timer_DeleteParticle(Handle timer, int iEntity)
-//{
-//    RemoveEntity(iEntity);
-//}

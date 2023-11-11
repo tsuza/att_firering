@@ -1,0 +1,11 @@
+[[dependency]]
+url = "https://github.com/nosoop/SM-TFUtils/blob/4802fa401a86d3088feb77c8a78d758c10806112/scripting/include/tf2utils.inc"
+path = "."
+
+[[dependency]]
+url = "https://github.com/nosoop/stocksoup/blob/35f78934c655a474e976b18178647a0e5753ce27/var_strings.inc"
+path = "stocksoup"
+
+[[dependency]]
+url = "https://github.com/nosoop/SM-TFCustAttr/blob/c266b6e5c29c8c0890607fe2b807f3d6166bff82/scripting/include/tf_custom_attributes.inc"
+path = "."
